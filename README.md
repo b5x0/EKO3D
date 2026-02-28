@@ -7,8 +7,8 @@ A fully native WebAR Gamified Trivia Experience built for the AI Night Challenge
 *No apps to download. No backend servers to run. Just point your camera.*
 
 ## 🚀 Live Demo & Links
-* **Live Deployment:** [Vercel Link Here]
-* **Demo Video:** [YouTube/Loom Link Here]
+* **Live Deployment:** [https://eko-3-d.vercel.app/]
+* **Demo Video:** [https://youtu.be/iAtXV9IxVGU]
 * **Target Image:** The `targets.mind` file compiles the features of the target image. Scan the astronaut/robot marker to initiate the AR experience!
 
 ## 🎮 Features
