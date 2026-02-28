@@ -1,0 +1,591 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <title>EKO3D AR Live Challenge</title>
+    <!-- Firebase App (the core Firebase SDK) -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <!-- Firebase Realtime Database -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+
+    <!-- Canvas Confetti -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+
+    <script type="importmap">
+    {
+      "imports": {
+        "three": "https://unpkg.com/three@0.139.2/build/three.module.js",
+        "three/addons/": "https://unpkg.com/three@0.139.2/examples/jsm/",
+        "mindar-image-three": "https://cdn.jsdelivr.net/npm/mind-ar@1.2.2/dist/mindar-image-three.prod.js"
+      }
+    }
+    </script>
+
+    <style>
+        html,
+        body {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #0b0c10;
+            color: #fff;
+        }
+
+        #ar-container {
+            width: 100%;
+            height: 100%;
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 1;
+        }
+
+        /* Cyberpunk Gamification UI */
+        #ui-layer {
+            position: absolute;
+            top: 15px;
+            left: 15px;
+            z-index: 100;
+            text-shadow: 0 0 5px #45a29e, 0 0 10px #45a29e;
+            font-size: 20px;
+            color: #66fcf1;
+            display: none;
+            /* Hidden until AR starts */
+            pointer-events: none;
+        }
+
+        .stat-box {
+            margin-bottom: 10px;
+            background: rgba(31, 40, 51, 0.75);
+            padding: 10px 15px;
+            border: 1px solid #45a29e;
+            border-radius: 8px;
+            box-shadow: 0 0 15px rgba(69, 162, 158, 0.3);
+            text-transform: uppercase;
+            font-weight: bold;
+            letter-spacing: 1px;
+        }
+
+        #score-val,
+        #streak-val {
+            font-size: 26px;
+            color: #fff;
+            text-shadow: 0 0 8px #fff;
+        }
+
+        /* Onboarding Screen */
+        #onboarding {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, rgba(11, 12, 16, 0.95), rgba(31, 40, 51, 0.95));
+            z-index: 200;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+
+        #onboarding h1 {
+            color: #66fcf1;
+            text-shadow: 0 0 10px #45a29e, 0 0 20px #45a29e;
+            font-size: 45px;
+            text-transform: uppercase;
+            letter-spacing: 4px;
+            margin-bottom: 30px;
+            text-align: center;
+            animation: glow 1.5s ease-in-out infinite alternate;
+        }
+
+        @keyframes glow {
+            from {
+                text-shadow: 0 0 5px #45a29e, 0 0 10px #45a29e;
+            }
+
+            to {
+                text-shadow: 0 0 15px #66fcf1, 0 0 25px #66fcf1;
+            }
+        }
+
+        #player-name {
+            padding: 15px;
+            font-size: 20px;
+            border: 2px solid #45a29e;
+            background: rgba(0, 0, 0, 0.5);
+            color: #66fcf1;
+            outline: none;
+            border-radius: 8px;
+            text-align: center;
+            box-shadow: inset 0 0 10px rgba(69, 162, 158, 0.3);
+            margin-bottom: 25px;
+            width: 80%;
+            max-width: 300px;
+            font-family: inherit;
+            font-weight: bold;
+        }
+
+        #player-name::placeholder {
+            color: rgba(102, 252, 241, 0.5);
+            font-weight: normal;
+        }
+
+        .cyber-btn {
+            background: transparent;
+            color: #66fcf1;
+            border: 2px solid #66fcf1;
+            padding: 15px 40px;
+            font-size: 22px;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            cursor: pointer;
+            border-radius: 8px;
+            box-shadow: 0 0 15px rgba(102, 252, 241, 0.4), inset 0 0 10px rgba(102, 252, 241, 0.2);
+            transition: all 0.2s;
+            font-family: inherit;
+        }
+
+        .cyber-btn:hover,
+        .cyber-btn:active {
+            background: #66fcf1;
+            color: #0b0c10;
+            box-shadow: 0 0 25px #66fcf1, inset 0 0 15px #66fcf1;
+        }
+
+        /* Trivia Popup */
+        #trivia-box {
+            display: none;
+            position: absolute;
+            bottom: 15%;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(11, 12, 16, 0.95);
+            color: #fff;
+            padding: 25px;
+            border-radius: 12px;
+            border: 2px solid #ff00ff;
+            text-align: center;
+            width: 85%;
+            max-width: 400px;
+            z-index: 100;
+            box-shadow: 0 0 25px rgba(255, 0, 255, 0.4);
+        }
+
+        #trivia-box h2 {
+            color: #ff00ff;
+            text-shadow: 0 0 8px #ff00ff;
+            margin-top: 0;
+            font-size: 28px;
+            text-transform: uppercase;
+        }
+
+        #trivia-box p {
+            font-size: 18px;
+            margin-bottom: 20px;
+        }
+
+        .trivia-btn {
+            background: transparent;
+            color: #ff00ff;
+            border: 2px solid #ff00ff;
+            padding: 12px 25px;
+            margin: 5px;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            box-shadow: 0 0 10px rgba(255, 0, 255, 0.3);
+            transition: all 0.2s;
+        }
+
+        .trivia-btn:active {
+            background: #ff00ff;
+            color: #000;
+        }
+
+        /* Action Buttons */
+        #action-buttons {
+            display: none;
+            position: absolute;
+            bottom: 30px;
+            left: 0;
+            width: 100%;
+            text-align: center;
+            z-index: 100;
+        }
+
+        .action-btn {
+            background: rgba(31, 40, 51, 0.85);
+            color: #66fcf1;
+            border: 2px solid #45a29e;
+            padding: 12px 20px;
+            margin: 0 8px;
+            font-size: 16px;
+            border-radius: 8px;
+            text-transform: uppercase;
+            font-weight: bold;
+            letter-spacing: 1px;
+            box-shadow: 0 0 12px rgba(69, 162, 158, 0.4);
+            cursor: pointer;
+            transition: 0.2s;
+        }
+
+        .action-btn:active {
+            background: #66fcf1;
+            color: #0b0c10;
+            box-shadow: 0 0 20px #66fcf1;
+        }
+
+        /* Correct / Wrong Flashes */
+        #flash-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 150;
+            opacity: 0;
+            transition: opacity 0.3s ease-out;
+        }
+
+        .flash-green {
+            background: rgba(0, 255, 100, 0.45);
+        }
+
+        .flash-red {
+            background: rgba(255, 0, 50, 0.45);
+        }
+
+        /* Prevent physical camera feed from zooming/cropping */
+        #ar-container video,
+        #ar-container canvas {
+            object-fit: contain !important;
+            width: 100% !important;
+            height: 100% !important;
+            top: 0 !important;
+            left: 0 !important;
+            margin: auto !important;
+        }
+    </style>
+</head>
+
+<body>
+    <!-- Container for AR Camera -->
+    <div id="ar-container"></div>
+
+    <!-- Fullscreen hit flashes -->
+    <div id="flash-overlay"></div>
+
+    <!-- 1. Onboarding Screen -->
+    <div id="onboarding">
+        <h1>EKO3D AR</h1>
+        <input type="text" id="player-name" placeholder="ENTER PLAYER NAME" autocomplete="off" />
+        <button class="cyber-btn" onclick="startExperience()">START AR</button>
+    </div>
+
+    <!-- 2. Gamification UI -->
+    <div id="ui-layer">
+        <div class="stat-box">SCORE: <span id="score-val">0</span></div>
+        <div class="stat-box">STREAK: <span id="streak-val">0</span></div>
+    </div>
+
+    <!-- 3. Trivia Logic Update -->
+    <div id="trivia-box">
+        <h2>EKO CHALLENGE!</h2>
+        <p id="trivia-q">What color did you paint EKO's jacket?</p>
+        <button class="trivia-btn" id="trivia-btn-true" onclick="checkAns(true)">PURPLE</button>
+        <button class="trivia-btn" id="trivia-btn-false" onclick="checkAns(false)">RED</button>
+    </div>
+
+    <!-- 4. Action Buttons -->
+    <div id="action-buttons">
+        <button class="action-btn" onclick="triggerDance()">DANCE (+5)</button>
+        <button class="action-btn" onclick="takePhoto()">TAKE PHOTO (+15)</button>
+    </div>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+        import { MindARThree } from 'mindar-image-three';
+
+        // ==========================================
+        // FIREBASE INTEGRATION (v8/v9 compat CDN)
+        // ==========================================
+        // INSERT YOUR FIREBASE CONFIG HERE:
+        const firebaseConfig = {
+            apiKey: "AIzaSyBmZkMUS2c18NwFNSBmYvmKhvi9fzED_PA",
+            authDomain: "eko-quest.firebaseapp.com",
+            databaseURL: "https://eko-quest-default-rtdb.europe-west1.firebasedatabase.app",
+            projectId: "eko-quest",
+            storageBucket: "eko-quest.firebasestorage.app",
+            messagingSenderId: "281139769929",
+            appId: "1:281139769929:web:3ad24e07989fb304cd0598",
+            measurementId: "G-T0T6KF8M4T"
+        };
+        // Initialize Firebase
+        if (!firebase.apps.length) {
+            firebase.initializeApp(firebaseConfig);
+        }
+        const db = firebase.database();
+
+        // Game State
+        let score = 0;
+        let streak = 0;
+        let playerName = "Unknown Player";
+
+        let mindarThree = null;
+        let mixer = null;
+        let danceAction = null;
+        let currentTriviaAnswer = true;
+
+        // Trivia Question Pool
+        const triviaQuestions = [
+            { q: "What color did you paint EKO's jacket?", ansTrue: "PURPLE", ansFalse: "RED", correct: true },
+            { q: "Which tech powers this WebAR experience?", ansTrue: "MindAR", ansFalse: "Unity", correct: true },
+            { q: "What is the name of this project?", ansTrue: "EKO3D", ansFalse: "EKO-2D", correct: true },
+            { q: "What database stores the leaderboard?", ansTrue: "Firebase", ansFalse: "MongoDB", correct: true }
+        ];
+
+        // Synthesize a quick retro success sound (no external file needed!)
+        const playSuccessSound = () => {
+            try {
+                const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+                osc.type = 'sine';
+
+                // Quick arpeggio
+                osc.frequency.setValueAtTime(440, ctx.currentTime);     // A4
+                osc.frequency.setValueAtTime(554.37, ctx.currentTime + 0.1); // C#5
+                osc.frequency.setValueAtTime(659.25, ctx.currentTime + 0.2); // E5
+
+                gain.gain.setValueAtTime(0.3, ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.00001, ctx.currentTime + 0.5);
+
+                osc.start(ctx.currentTime);
+                osc.stop(ctx.currentTime + 0.5);
+            } catch (e) { console.log("Audio not supported"); }
+        };
+
+        // Start Experience from Onboarding
+        window.startExperience = () => {
+            const nameInput = document.getElementById('player-name').value.trim();
+            if (nameInput) playerName = nameInput;
+
+            document.getElementById('onboarding').style.display = 'none';
+            document.getElementById('ui-layer').style.display = 'block';
+
+            // Try to fetch existing score from Firebase
+            if (playerName) {
+                db.ref('users/' + playerName).once('value').then((snapshot) => {
+                    if (snapshot.exists()) {
+                        const data = snapshot.val();
+                        score = data.score || 0;
+                        updateScoreboardUI();
+                    } else {
+                        updateFirebaseScore(); // Push initial score 0 for new user
+                    }
+                    startAR();
+                }).catch(err => {
+                    console.log("Firebase get failed or offline", err);
+                    startAR();
+                });
+            } else {
+                startAR();
+            }
+        };
+
+        const updateScoreboardUI = () => {
+            document.getElementById('score-val').innerText = score;
+            document.getElementById('streak-val').innerText = streak;
+            updateFirebaseScore();
+        };
+
+        // Firebase Push score
+        const updateFirebaseScore = () => {
+            if (playerName) {
+                db.ref('users/' + playerName).set({
+                    name: playerName,
+                    score: score,
+                    timestamp: firebase.database.ServerValue.TIMESTAMP
+                }).catch(err => console.warn("Firebase not configured correctly yet. Update firebaseConfig!", err));
+            }
+        };
+
+        // Screen Falsh
+        const showFlash = (isCorrect) => {
+            const overlay = document.getElementById('flash-overlay');
+            overlay.className = isCorrect ? 'flash-green' : 'flash-red';
+            overlay.style.opacity = '1';
+            setTimeout(() => { overlay.style.opacity = '0'; }, 400);
+        };
+
+        // Trivia Logic
+        window.checkAns = (isCorrect) => {
+            if (isCorrect === currentTriviaAnswer) {
+                // Correct: Score +10, Streak +1, Green Flash
+                score += 10;
+                streak += 1;
+                showFlash(true);
+                confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
+                playSuccessSound();
+                if (danceAction) {
+                    danceAction.reset();
+                    danceAction.setLoop(THREE.LoopRepeat, 2);
+                    danceAction.clampWhenFinished = true;
+                    danceAction.play();
+                }
+            } else {
+                // Wrong: Streak resets to 0, Red Flash
+                streak = 0;
+                showFlash(false);
+            }
+            updateScoreboardUI();
+            document.getElementById('trivia-box').style.display = 'none';
+        }
+
+        // Action Button: Dance
+        window.triggerDance = () => {
+            score += 5;
+            updateScoreboardUI();
+            confetti({ particleCount: 50, spread: 50, origin: { y: 0.8 } });
+            playSuccessSound();
+            if (danceAction) {
+                danceAction.reset();
+                danceAction.setLoop(THREE.LoopRepeat, 2);
+                danceAction.clampWhenFinished = true;
+                danceAction.play();
+            }
+        };
+
+        // Action Button: Take Photo
+        window.takePhoto = () => {
+            if (!mindarThree) return;
+            const { renderer } = mindarThree;
+
+            // Score +15 points
+            score += 15;
+            updateScoreboardUI();
+
+            // Render one frame exactly to make sure buffers are complete
+            // mind-ar handles video via a hidden video tag & canvas combo
+            // WebGL canvas dataURL will capture the 3D augmented content
+            const dataURL = renderer.domElement.toDataURL("image/png");
+
+            const a = document.createElement('a');
+            a.href = dataURL;
+            a.download = `EKO3D_${playerName.replace(/\s+/g, '_')}_AR_Photo.png`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+
+            showFlash(true); // Green flash confirmation
+        };
+
+        // Core AR Engine Start
+        const startAR = async () => {
+            mindarThree = new MindARThree({
+                container: document.querySelector("#ar-container"),
+                imageTargetSrc: './targets.mind',
+                uiLoading: "yes",
+                uiScanning: "yes",
+                uiError: "yes",
+                // Constraint: Ensure preserveDrawingBuffer is true for Photo Capture
+                preserveDrawingBuffer: true
+            });
+
+            const { renderer, scene, camera } = mindarThree;
+            const anchor = mindarThree.addAnchor(0);
+
+            // Add better lighting to ensure the model isn't rendering pitch black
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
+            scene.add(ambientLight);
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+            directionalLight.position.set(0, 10, 5);
+            scene.add(directionalLight);
+
+            const loader = new GLTFLoader();
+            loader.load('./ModelDancing.glb', (gltf) => {
+                const model = gltf.scene;
+
+                // For native/good GLBs, standard scale is usually fine.
+                // Depending on how it was exported, we might need to tweak this scale (e.g. 0.5 or 1.0)
+                // Let's use a safe bounding box normalizer to ensure it fits perfectly on the marker
+                const box = new THREE.Box3().setFromObject(model);
+                const size = box.getSize(new THREE.Vector3());
+                const center = box.getCenter(new THREE.Vector3());
+
+                const maxDim = Math.max(size.x, size.y, size.z);
+                const scale = 1 / maxDim;
+
+                // Scale to roughly 0.8 units (MindAR targets are 1 unit wide)
+                model.scale.set(scale * 0.8, scale * 0.8, scale * 0.8);
+
+                // Center the model's feet on the marker
+                model.position.x = -center.x * scale * 0.8;
+                model.position.y = (-center.y + (size.y / 2)) * scale * 0.8;
+                model.position.z = -center.z * scale * 0.8;
+
+                anchor.group.add(model);
+
+                mixer = new THREE.AnimationMixer(model);
+
+                // Listen for the animation finish event to smoothly stop and return to T-Pose
+                mixer.addEventListener('finished', (e) => {
+                    if (e.action === danceAction) {
+                        danceAction.fadeOut(0.5);
+                    }
+                });
+
+                if (gltf.animations.length > 0) {
+                    danceAction = mixer.clipAction(gltf.animations[0]);
+                }
+
+                anchor.onTargetFound = () => {
+                    document.getElementById('action-buttons').style.display = 'block';
+
+                    // Show a new trivia question when the target is found, if one isn't already active
+                    const triviaBox = document.getElementById('trivia-box');
+                    if (triviaBox.style.display !== 'block') {
+                        // Pick random question
+                        const qObj = triviaQuestions[Math.floor(Math.random() * triviaQuestions.length)];
+                        currentTriviaAnswer = qObj.correct;
+                        document.getElementById('trivia-q').innerText = qObj.q;
+                        document.getElementById('trivia-btn-true').innerText = qObj.ansTrue;
+                        document.getElementById('trivia-btn-false').innerText = qObj.ansFalse;
+
+                        triviaBox.style.display = 'block';
+                    }
+                };
+
+                anchor.onTargetLost = () => {
+                    document.getElementById('action-buttons').style.display = 'none';
+                    document.getElementById('trivia-box').style.display = 'none';
+                };
+            });
+
+            await mindarThree.start();
+
+            renderer.setAnimationLoop(() => {
+                const delta = 0.016;
+                if (mixer) mixer.update(delta);
+                renderer.render(scene, camera);
+            });
+        };
+    </script>
+</body>
+
+</html>

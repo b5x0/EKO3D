@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EKO3D Live Leaderboard</title>
+
+    <!-- Firebase App (the core Firebase SDK) -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <!-- Firebase Realtime Database -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #0b0c10;
+            font-family: 'Courier New', Courier, monospace;
+            color: #66fcf1;
+            overflow-x: hidden;
+            text-align: center;
+        }
+
+        h1 {
+            font-size: 50px;
+            text-transform: uppercase;
+            letter-spacing: 5px;
+            text-shadow: 0 0 15px #45a29e, 0 0 25px #45a29e;
+            margin-top: 50px;
+            margin-bottom: 40px;
+            animation: pulse 2s infinite alternate;
+        }
+
+        @keyframes pulse {
+            0% {
+                text-shadow: 0 0 10px #45a29e, 0 0 20px #45a29e;
+            }
+
+            100% {
+                text-shadow: 0 0 25px #66fcf1, 0 0 45px #66fcf1;
+            }
+        }
+
+        #leaderboard {
+            width: 90%;
+            max-width: 800px;
+            margin: 0 auto;
+            background: rgba(31, 40, 51, 0.8);
+            border: 2px solid #45a29e;
+            border-radius: 15px;
+            box-shadow: 0 0 40px rgba(69, 162, 158, 0.4);
+            padding: 30px;
+        }
+
+        .board-header {
+            display: flex;
+            justify-content: space-between;
+            font-size: 26px;
+            font-weight: bold;
+            border-bottom: 3px solid #45a29e;
+            padding-bottom: 15px;
+            margin-bottom: 25px;
+            color: #fff;
+            text-shadow: 0 0 8px #fff;
+        }
+
+        .user-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 24px;
+            padding: 18px 15px;
+            margin-bottom: 12px;
+            background: rgba(0, 0, 0, 0.6);
+            border-radius: 8px;
+            transition: all 0.3s;
+            border-left: 6px solid transparent;
+        }
+
+        /* High-end arcade styling for top 3 */
+        .user-row.rank-1 {
+            border-left-color: #ffd700;
+            color: #ffd700;
+            font-weight: bold;
+            font-size: 28px;
+            box-shadow: 0 0 20px rgba(255, 215, 0, 0.2);
+            background: rgba(255, 215, 0, 0.1);
+        }
+
+        .user-row.rank-2 {
+            border-left-color: #c0c0c0;
+            color: #c0c0c0;
+            font-weight: bold;
+            font-size: 26px;
+        }
+
+        .user-row.rank-3 {
+            border-left-color: #cd7f32;
+            color: #cd7f32;
+            font-weight: bold;
+            font-size: 25px;
+        }
+
+        .user-row:hover {
+            background: rgba(69, 162, 158, 0.3);
+            transform: scale(1.02);
+        }
+
+        .user-name {
+            flex: 1;
+            text-align: left;
+            padding-left: 25px;
+        }
+
+        .user-score {
+            width: 120px;
+            text-align: right;
+            text-shadow: 0 0 8px currentColor;
+        }
+
+        .user-rank {
+            width: 60px;
+            text-align: left;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>🌟 LIVE HIGHSCORES 🌟</h1>
+
+    <div id="leaderboard">
+        <div class="board-header">
+            <div class="user-rank">#</div>
+            <div class="user-name">PLAYER</div>
+            <div class="user-score">SCORE</div>
+        </div>
+        <div id="scores-container">
+            <div class="user-row">
+                <div class="user-rank">-</div>
+                <div class="user-name">Waiting for data...</div>
+                <div class="user-score">-</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ==========================================
+        // FIREBASE INTEGRATION
+        // ==========================================
+        // INSERT YOUR FIREBASE CONFIG HERE:
+        const firebaseConfig = {
+            apiKey: "AIzaSyBmZkMUS2c18NwFNSBmYvmKhvi9fzED_PA",
+            authDomain: "eko-quest.firebaseapp.com",
+            databaseURL: "https://eko-quest-default-rtdb.europe-west1.firebasedatabase.app",
+            projectId: "eko-quest",
+            storageBucket: "eko-quest.firebasestorage.app",
+            messagingSenderId: "281139769929",
+            appId: "1:281139769929:web:3ad24e07989fb304cd0598",
+            measurementId: "G-T0T6KF8M4T"
+        };
+
+        // Initialize Firebase
+        if (!firebase.apps.length) {
+            firebase.initializeApp(firebaseConfig);
+        }
+        const db = firebase.database();
+
+        const scoresContainer = document.getElementById('scores-container');
+
+        // Real-time listener sorting by score natively
+        db.ref('users').orderByChild('score').on('value', (snapshot) => {
+            const users = [];
+            snapshot.forEach((childSnapshot) => {
+                users.push(childSnapshot.val());
+            });
+
+            // Firebase returns ascending order by default, reverse it for descending
+            users.reverse();
+
+            // Render leaderboard
+            scoresContainer.innerHTML = '';
+
+            if (users.length === 0) {
+                scoresContainer.innerHTML = `
+                    <div class="user-row">
+                        <div class="user-rank">-</div>
+                        <div class="user-name">No players yet.</div>
+                        <div class="user-score">0</div>
+                    </div>`;
+                return;
+            }
+
+            users.forEach((user, index) => {
+                const rank = index + 1;
+                const row = document.createElement('div');
+                row.className = `user-row ${rank <= 3 ? 'rank-' + rank : ''}`;
+
+                let rankDisplay = rank;
+                if (rank === 1) rankDisplay = '🥇';
+                if (rank === 2) rankDisplay = '🥈';
+                if (rank === 3) rankDisplay = '🥉';
+
+                row.innerHTML = `
+                    <div class="user-rank">${rankDisplay}</div>
+                    <div class="user-name">${escapeHtml(user.name)}</div>
+                    <div class="user-score">${user.score}</div>
+                `;
+                scoresContainer.appendChild(row);
+            });
+        }, (errorObject) => {
+            console.error("Firebase read failed: " + errorObject.name);
+            scoresContainer.innerHTML = `
+                <div class="user-row">
+                    <div class="user-rank">!</div>
+                    <div class="user-name" style="color:#ff0050;">Error loading scoreboard.<br>Check Firebase config.</div>
+                    <div class="user-score">-</div>
+                </div>`;
+        });
+
+        function escapeHtml(unsafe) {
+            return (unsafe || "").toString()
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
+        }
+    </script>
+</body>
+
+</html>
